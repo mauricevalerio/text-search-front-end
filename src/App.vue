@@ -2,12 +2,14 @@
   <Main></Main>
 </template>
 
-<script>
-import Main from './components/Main.vue'
+<script lang="ts">
 
-export default {
+import { defineComponent } from 'vue';
+import Main from "./components/Main.vue";
+
+export default defineComponent({
   components: { Main }
-}
+})
 </script>
 
 <style scoped>

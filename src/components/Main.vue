@@ -1,76 +1,95 @@
 <template>
-  <h1>Text Search</h1>
-  <p>This counts the number of occurrences of text found in the sentence.</p>
-  <form @submit.prevent="getMatchCount">
-    <div>
-      <label for="sentence">Sentence</label>
-      <span class="error-msg error-msg-sentence" v-if="errorMessages.sentence">{{ errorMessages.sentence }}</span>
-      <textarea :class="[`${errorMessages.sentence ? 'error-border' : undefined}`]" id="sentence" cols="30" rows="10" v-model="textSearchObject.sentence"></textarea>
-    </div>
+  
+  <header>
+    <h1>Text Search</h1>
+  
+    <p>This counts the number of occurrences of text found in the sentence.</p>
+  </header>
+  
+  <main>
+    <Form :dataObject="dataObject" @getOccurrences="getOccurrences" :errorMessage="errorMessage"></Form>
 
-    <div>
-      <label for="text">Text to search</label>
-      <input type="text" id="text" v-model="textSearchObject.text" :class="[`${errorMessages.text ? 'error-border' : undefined}`]"/>
-      <span class="error-msg error-msg-text" v-if="errorMessages.text">{{ errorMessages.text }}</span>
-    </div>
-
-    <div>
-      <input type="checkbox" id="isFullWordSearch" v-model="textSearchObject.isFullWordSearch" />
-      <label for="isFullWordSearch">Full Word Search</label>
-    </div>
-
-    <div>
-      <input type="checkbox" id="isCaseSensitive" v-model="textSearchObject.isCaseSensitive" />
-      <label for="isCaseSensitive">Case Sensitive Search</label>
-    </div>
-    <button>Search</button>
-
-    <p>Number of occurrences {{ textOccurrence }}</p>
-  </form>
+    <HistoryList :history="history" @loadHistory="loadHistory"></HistoryList>
+  </main>
+  
 </template>
 
-<script>
-import { textSearchApi } from '../../utils/api';
+<script lang="ts">
+import { defineComponent } from 'vue';
+import Form from './Form.vue';
+import HistoryList from './HistoryList.vue';
+import { textSearchApi } from '../utils/api';
+import type { Data } from '@/types';
 
-  export default {
-    data() {
+  export default defineComponent({
+    components: { Form, HistoryList },
+    data(): Data {
       return {
-        textSearchObject: {
+        dataObject: {
           sentence: "",
           text: "",
           isFullWordSearch: false,
           isCaseSensitive: false, 
         },
-        errorMessages: {
-          sentence: "",
-          text: ""
-        },
-        textOccurrence: ""
+        errorMessage: "",
+        textOccurrence: "",
+        history: JSON.parse(localStorage.getItem("dataObject") || "[]")
       }
     },
     methods: {
-      async getMatchCount() {
-          const data = await textSearchApi(this.textSearchObject);
-        
-          if (data.text || data.sentence) {
-            this.errorMessages.text = data.text && data.text[0];
-            this.errorMessages.sentence = data.sentence && data.sentence[0];
-          } else {
-            this.resetForm();
-            this.textOccurrence = data;
-          }
+      async getOccurrences() {
+        try {
+          const data = await textSearchApi(this.dataObject);
+          
+          this.textOccurrence = data.toString();
 
+          this.getLocalStorageData();
+          
+          this.resetForm();
+
+        } catch (err) {
+            if (err instanceof Error) {
+              this.errorMessage = `${err.message} - Unable to communicate with the web server API.`;
+            } else {
+              this.errorMessage = "An unknown error occurred.";
+            }
+        }
       },
       resetForm() {
-        this.textSearchObject.sentence = "";
-        this.textSearchObject.text = "";
-        this.textSearchObject.isFullWordSearch = false;
-        this.textSearchObject.isCaseSensitive = false;
-        this.errorMessages.sentence = "";
-        this.errorMessages.text = "";
+        this.dataObject.sentence = "";
+        this.dataObject.text = "";
+        this.dataObject.isFullWordSearch = false;
+        this.dataObject.isCaseSensitive = false;
+        this.errorMessage = "";
+      },
+      getLocalStorageData() {
+        if (localStorage.getItem("dataObject")) {
+            localStorage.setItem("dataObject", JSON.stringify( 
+              [ 
+                {
+                  ...this.dataObject, 
+                  "Occurrences": this.textOccurrence 
+                }, 
+                ...JSON.parse(localStorage.getItem("dataObject")!)
+              ]
+            ));
+          
+          } else {
+            localStorage.setItem("dataObject", JSON.stringify([{ ...this.dataObject, "Occurrences": this.textOccurrence }]));
+          }
+          
+          this.history = JSON.parse(localStorage.getItem("dataObject")!)
+      },
+      loadHistory(idx: number) {
+        const selectedHistory = this.history.find((_, index) => index === idx)!
+
+        this.dataObject.sentence = selectedHistory.sentence
+        this.dataObject.text = selectedHistory.text
+        this.dataObject.isFullWordSearch = selectedHistory.isFullWordSearch
+        this.dataObject.isCaseSensitive = selectedHistory.isCaseSensitive
       }
     }
-  }
+  })
 
 </script>
 
